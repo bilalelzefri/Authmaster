@@ -1,5 +1,7 @@
 const express = require("express");
+const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs")
+const protect = require("../middleware/authMiddleware");
 const router = express.Router();
 const user = require("../modules/user");
 router.post("/signup", async (req,res) => {
@@ -29,19 +31,34 @@ res.status(500).json({message:"server error"})
 router.post("/login", async (req,res)=>{
 const {email, password} = req.body;
 try{
-    const notexistingUser = await user.findOne({email});
-    if(!notexistingUser){
+    const foundUser = await user.findOne({email});
+    if(!foundUser){
         return res.status(400).json({message:"Invalid email or password"});
     }
-    const isMatched = bcrypt.compare(password, user.password);
+    const isMatched = await bcrypt.compare(password, foundUser.password);
     if(!isMatched){
         return res.status(400).json({message:"Invalid email or password"});
     }
-     res.status(200).json({ message: "Login successful" });
+    const payload = {
+      userId: foundUser._id,
+      email: foundUser.email
+    };
+
+    const token = jwt.sign(payload, process.env.JWT_SECRET, {
+      expiresIn: "1h"
+    });
+
+     res.status(200).json({ message: "Login successful",token:token });
 }catch(error){
 console.log(error);
 res.status(500).json({message:"server problem"});
 }
+});
+router.get("/dashboard", protect ,(req, res)=>{
+res.json({
+    message: `Welcome to your dashboard, ${req.user.email}`,
+    user: req.user
+  });
 })
 
 
